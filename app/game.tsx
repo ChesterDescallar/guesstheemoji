@@ -121,15 +121,15 @@ export default function Game() {
           'one punch man': 'https://media.giphy.com/media/jj1xut6ZsokKI/giphy.gif',
         };
 
+        const basePath = process.env.NODE_ENV === 'production' ? '/guesstheemoji' : '';
         const SOUND_MAP: Record<string, string> = {
-          // Map to audio files you said are available in public/audio/
-          'demon slayer': '/audio/demon-slayer.mp3',
-          'naruto': '/audio/naruto.mp3',
-          'sailor moon': '/audio/sailor-moon.mp3',
-          'dragon ball': '/audio/dragon-ball.mp3',
-          'attack on titan': '/audio/attack-on-titan.mp3',
-          'bleach': '/audio/bleach.mp3',
-          'one punch man': '/audio/one-punch-man.mp3',
+          'demon slayer': `${basePath}/audio/demon-slayer.mp3`,
+          'naruto': `${basePath}/audio/naruto.mp3`,
+          'sailor moon': `${basePath}/audio/sailor-moon.mp3`,
+          'dragon ball': `${basePath}/audio/dragon-ball.mp3`,
+          'attack on titan': `${basePath}/audio/attack-on-titan.mp3`,
+          'bleach': `${basePath}/audio/bleach.mp3`,
+          'one punch man': `${basePath}/audio/one-punch-man.mp3`,
         };
 
         const mappedGif = GIF_MAP[expected.toLowerCase()];
