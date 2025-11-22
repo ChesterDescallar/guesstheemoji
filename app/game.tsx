@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import Image from "next/image";
 
 type Puzzle = {
   emoji: string;
@@ -56,22 +57,32 @@ export default function Game() {
     return Math.max(5, initial - steps * decreasePer3);
   }
 
+  const levelTime = computeTimeForLevel(index);
   useEffect(() => {
     if (isOver) return;
-    setTimeLeft(computeTimeForLevel(index));
-    setInput("");
-  }, [index, isOver]);
+    // Reset timer and input when level changes - this is intentional synchronization
+    const newTime = levelTime;
+    const timerId = setTimeout(() => {
+      setTimeLeft(newTime);
+      setInput("");
+    }, 0);
+    return () => clearTimeout(timerId);
+  }, [index, isOver, levelTime]);
 
   useEffect(() => {
-    if (isOver || !started) return;
+    // Don't run timer while showing GIF/audio
+    if (isOver || !started || showingGif) return;
     if (timeLeft <= 0) {
-      setIsOver(true);
-      setLost(true);
-      return;
+      // Schedule state update to avoid synchronous setState in effect
+      const timeoutId = setTimeout(() => {
+        setIsOver(true);
+        setLost(true);
+      }, 0);
+      return () => clearTimeout(timeoutId);
     }
     const id = setInterval(() => setTimeLeft((t) => t - 1), 1000);
     return () => clearInterval(id);
-  }, [timeLeft, isOver, started]);
+  }, [timeLeft, isOver, started, showingGif]);
 
   function normalize(s: string) {
     return s.trim().toLowerCase();
@@ -159,7 +170,7 @@ export default function Game() {
                 // fallback to timed advance
                 scheduleAdvance(3000);
               });
-            } catch (e) {
+            } catch {
               scheduleAdvance(3000);
             }
           } else {
@@ -167,49 +178,26 @@ export default function Game() {
           }
           setTimeout(() => setGifLoading(false), 300);
         } else {
-          (async () => {
+          // No mapped GIF: play mapped sound if present, otherwise advance after short delay
+          setGifUrl(null);
+          if (mappedSound) {
             try {
-              setGifLoading(true);
-              const res = await fetch(`/api/gif?q=${encodeURIComponent(expected)}`);
-              if (res.ok) {
-                const body = await res.json();
-                setGifUrl(body.url || null);
-                setShowingGif(true);
-                if (mappedSound) {
-                  try {
-                    const audio = new Audio(mappedSound);
-                    audio.onended = () => scheduleAdvance(0);
-                    audio.play().catch(() => scheduleAdvance(3000));
-                  } catch {
-                    scheduleAdvance(3000);
-                  }
-                } else {
-                  scheduleAdvance(3000);
-                }
-              } else {
-                setGifUrl(null);
-                if (mappedSound) {
-                  try { new Audio(mappedSound).play().catch(() => {}); } catch {}
-                }
-                scheduleAdvance(700);
-              }
-            } catch (err) {
-              setGifUrl(null);
-              if (mappedSound) {
-                try { new Audio(mappedSound).play().catch(() => {}); } catch {}
-              }
-              scheduleAdvance(700);
-            } finally {
-              setGifLoading(false);
+              const audio = new Audio(mappedSound);
+              audio.onended = () => scheduleAdvance(0);
+              audio.play().catch(() => scheduleAdvance(3000));
+            } catch {
+              scheduleAdvance(3000);
             }
-          })();
+          } else {
+            scheduleAdvance(3000);
+          }
         }
 
       // play a short synth chime (safe) and optionally a mapped audio URL
       try {
         const playChime = () => {
           try {
-            const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+            const ctx = new (window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)();
             const now = ctx.currentTime;
             const o = ctx.createOscillator();
             const g = ctx.createGain();
@@ -222,10 +210,14 @@ export default function Game() {
             g.connect(ctx.destination);
             o.start(now);
             o.stop(now + 0.65);
-          } catch (e) {}
+          } catch {
+            // Ignore audio context errors
+          }
         };
         playChime();
-      } catch (e) {}
+      } catch {
+        // Ignore chime playback errors
+      }
 
       if (index + 1 >= puzzles.length) {
         setIsOver(true);
@@ -245,7 +237,7 @@ export default function Game() {
 
   function handleRestart() {
     // reshuffle puzzles on restart
-    setPuzzles((prev) => {
+    setPuzzles(() => {
       const arr = [...PUZZLES];
       for (let i = arr.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
@@ -276,7 +268,7 @@ export default function Game() {
               aria-live="polite"
               className="rounded-md bg-red-600/95 px-4 py-2 text-white shadow-lg game-pop"
             >
-              Time's up — answer: <span className="font-semibold">{current.answer}</span>
+              Time&apos;s up — answer: <span className="font-semibold">{current.answer}</span>
             </div>
           )}
         </div>
@@ -290,7 +282,7 @@ export default function Game() {
             <div className="mt-2 text-sm text-zinc-500">Loading GIF…</div>
           ) : gifUrl ? (
             <div className="mt-4 w-full flex items-center justify-center">
-              <img src={gifUrl} alt="anime gif" className="max-h-48 rounded-md shadow-md" />
+              <Image src={gifUrl} alt="anime gif" className="max-h-48 rounded-md shadow-md" width={320} height={192} unoptimized />
             </div>
           ) : null
         ) : (

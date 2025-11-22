@@ -30,7 +30,7 @@ export async function GET(req: Request) {
     if (!url) return NextResponse.json({ error: 'no gif url' }, { status: 404 });
 
     return NextResponse.json({ url });
-  } catch (err) {
+  } catch {
     return NextResponse.json({ error: 'server error' }, { status: 500 });
   }
 }
